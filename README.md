@@ -53,15 +53,15 @@ The easiest way to run this is with Docker Compose. You do not need to clone the
   ```yaml
 
 services:
-  web:
+  web:  # <--- MUST be indented (2 spaces)
     image: ghcr.io/nuken/dexcom-glucose-logger:latest
     container_name: dexcom-web
     restart: unless-stopped
     ports:
       - 5000:5000
     environment:
-      - DEXCOM_USER=your_username
-      - DEXCOM_PASS=your_password
+      - DEXCOM_USER=your_username_here
+      - DEXCOM_PASS=your_password_here
       - DEXCOM_OUS=False
       - TZ=America/New_York
     volumes:
@@ -69,7 +69,6 @@ services:
 
 volumes:
   glucose_data:
-
 ```
   
 3.  **Run it:**
@@ -91,15 +90,15 @@ If you use a dashboard like Portainer or Dockge, you can deploy this as a **Stac
 ```yaml
 
 services:
-  web:
+  web:  # <--- MUST be indented (2 spaces)
     image: ghcr.io/nuken/dexcom-glucose-logger:latest
     container_name: dexcom-web
     restart: unless-stopped
     ports:
       - 5000:5000
     environment:
-      - DEXCOM_USER=your_username
-      - DEXCOM_PASS=your_password
+      - DEXCOM_USER=your_username_here
+      - DEXCOM_PASS=your_password_here
       - DEXCOM_OUS=False
       - TZ=America/New_York
     volumes:
@@ -158,6 +157,7 @@ Contributions, issues, and feature requests are welcome! Feel free to check the 
 ## 📄 License
 
 This project is [MIT](LICENSE) licensed.
+
 
 
 
