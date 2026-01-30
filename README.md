@@ -28,7 +28,13 @@ _The dashboard provides a clean, sortable view of your glucose trends, designed 
 
 ---
 
-## 🚀 Quick Start (Docker Compose)
+## ✅ Prerequisites
+
+Before running this logger, ensure:
+1.  **Dexcom Share is Enabled:** The main Dexcom account **must** have the "Share" feature enabled in the mobile app.
+2.  **At Least One Follower:** Dexcom often requires at least one active follower (or pending invitation) for the Share API to function.
+
+---
 
 The easiest way to run this is with Docker Compose.
 
@@ -93,3 +99,4 @@ Contributions, issues, and feature requests are welcome! Feel free to check the 
 ## 📄 License
 
 This project is [MIT](LICENSE) licensed.
+
