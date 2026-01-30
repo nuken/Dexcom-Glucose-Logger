@@ -15,9 +15,13 @@ IS_OUS = os.environ.get('DEXCOM_OUS', 'False').lower() == 'true'
 DEXCOM_REGION = "ous" if IS_OUS else "us"
 DB_FILE = "/app/glucose.db"
 
+# GLOBAL STATE
+# We use this to prevent spamming Dexcom logins
+last_sync_time = 0
+SYNC_COOLDOWN = 300  # 5 Minutes (in seconds)
+
 # --- DATABASE FUNCTIONS ---
 def init_db():
-    """Creates the table if it doesn't exist."""
     with sqlite3.connect(DB_FILE) as conn:
         conn.execute('''
             CREATE TABLE IF NOT EXISTS readings (
@@ -30,10 +34,8 @@ def init_db():
         ''')
 
 def save_readings_to_db(readings):
-    """Saves a list of readings to SQLite, ignoring duplicates."""
     if not readings:
         return
-    
     with sqlite3.connect(DB_FILE) as conn:
         for r in readings:
             t_str = r.datetime.strftime('%Y-%m-%d %H:%M:%S')
@@ -44,24 +46,33 @@ def save_readings_to_db(readings):
                 )
             except Exception as e:
                 print(f"DB Error: {e}")
-    print(f"Synced {len(readings)} readings to database.")
+
+# --- SYNC FUNCTION (Shared) ---
+def perform_dexcom_sync(minutes=1440):
+    """Handles the actual connection to Dexcom."""
+    global last_sync_time
+    try:
+        print(f"Connecting to Dexcom (Lookback: {minutes}m)...")
+        dexcom = Dexcom(
+            username=DEXCOM_USER, 
+            password=DEXCOM_PASS, 
+            region=DEXCOM_REGION
+        )
+        readings = dexcom.get_glucose_readings(minutes=minutes)
+        save_readings_to_db(readings)
+        
+        # Update the timestamp so we know we just synced
+        last_sync_time = time.time()
+        return True
+    except Exception as e:
+        print(f"Sync Failed: {e}")
+        return False
 
 # --- BACKGROUND SYNC ---
 def background_sync():
-    """Runs every 30 minutes to fetch data from Dexcom."""
+    """Runs every 30 minutes to fetch data."""
     while True:
-        try:
-            print("Starting background sync...")
-            dexcom = Dexcom(
-                username=DEXCOM_USER, 
-                password=DEXCOM_PASS, 
-                region=DEXCOM_REGION
-            )
-            readings = dexcom.get_glucose_readings(minutes=1440)
-            save_readings_to_db(readings)
-        except Exception as e:
-            print(f"Background Sync Failed: {e}")
-        
+        perform_dexcom_sync(minutes=1440)
         time.sleep(1800)
 
 try:
@@ -77,27 +88,22 @@ def index():
 
 @app.route('/api/readings')
 def get_readings():
-    # 1. Trigger Quick Live Sync
-    try:
-        dexcom = Dexcom(
-            username=DEXCOM_USER, 
-            password=DEXCOM_PASS, 
-            region=DEXCOM_REGION
-        )
-        latest = dexcom.get_glucose_readings(minutes=40)
-        save_readings_to_db(latest)
-    except:
-        pass
+    # --- RATE LIMIT PROTECTION ---
+    # Only "Live Sync" if it has been more than 5 minutes since the last sync
+    global last_sync_time
+    time_since_last_sync = time.time() - last_sync_time
+    
+    if time_since_last_sync > SYNC_COOLDOWN:
+        print("Live sync triggered (Cooldown expired)")
+        perform_dexcom_sync(minutes=40)
+    else:
+        print(f"Skipping live sync (Recently synced {int(time_since_last_sync)}s ago)")
 
-    # 2. Query & Filter Data
+    # 2. Query & Filter Data (Same as before)
     try:
-        step = int(request.args.get('step', 1))       # 1=All, 3=15m, 6=30m, 12=1h
+        step = int(request.args.get('step', 1))
         minutes_back = int(request.args.get('minutes', 1440))
-        
-        # Calculate the Target Interval in Minutes
-        # If step is 1, interval is 0 (show all). If step is 3, interval is 15.
         target_interval = 0 if step == 1 else (step * 5)
-        
         cutoff = datetime.now() - timedelta(minutes=minutes_back)
         
         data = []
@@ -107,35 +113,21 @@ def get_readings():
             rows = cursor.fetchall()
             
             last_kept_time = None
-            
             for row in rows:
-                # Parse the time
                 dt = datetime.strptime(row[0], '%Y-%m-%d %H:%M:%S')
-                
                 keep_row = False
-                
                 if step == 1:
-                    # If "All Readings", keep everything
                     keep_row = True
                 elif last_kept_time is None:
-                    # Always keep the very first (newest) reading
                     keep_row = True
                 else:
-                    # TIME CALCULATION:
-                    # Check difference between the last one we showed and this one
-                    # Since we are going DESC (Newest -> Oldest), last_kept_time is larger
                     diff_mins = (last_kept_time - dt).total_seconds() / 60
-                    
-                    # If the gap is big enough (e.g. >= 15 mins), keep it
                     if diff_mins >= target_interval:
                         keep_row = True
                 
                 if keep_row:
                     last_kept_time = dt
-                    
-                    # Format Pretty Time
                     friendly_time = dt.strftime('%b %d, %Y %-I:%M %p').replace('AM', 'am').replace('PM', 'pm')
-                    
                     data.append({
                         'timestamp': row[0],
                         'time': friendly_time,
@@ -143,7 +135,6 @@ def get_readings():
                         'trend': row[2],
                         'trend_arrow': row[3]
                     })
-                
         return jsonify(data)
     except Exception as e:
         return jsonify({'error': str(e)}), 500
