@@ -40,8 +40,8 @@ The easiest way to run this is with Docker Compose.
 
 1.  **Clone the repository:**
     ```bash
-    git clone https://github.com/nuken/dexcom-g7-glucose-logger.git
-    cd dexcom-g7-glucose-logger
+    git clone https://github.com/nuken/dexcom-glucose-logger.git
+    cd dexcom-glucose-logger
     ```
 
 2.  **Configure your credentials:**
@@ -94,7 +94,7 @@ This application stores your personal health data in a local file named `glucose
 
 ## 🤝 Contributing
 
-Contributions, issues, and feature requests are welcome! Feel free to check the [issues page](https://github.com/nuken/dexcom-g7-glucose-logger/issues).
+Contributions, issues, and feature requests are welcome! Feel free to check the [issues page](https://github.com/nuken/dexcom-glucose-logger/issues).
 
 ## Acknowledgements
 
@@ -103,6 +103,7 @@ Contributions, issues, and feature requests are welcome! Feel free to check the 
 ## 📄 License
 
 This project is [MIT](LICENSE) licensed.
+
 
 
 
