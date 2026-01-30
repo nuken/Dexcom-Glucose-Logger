@@ -47,13 +47,7 @@ The easiest way to run this is with Docker Compose. You do not need to clone the
     cd dexcom-logger
     ```
 
-2.  **Create the database file:**
-    Docker requires this file to exist before we start so it can map it correctly.
-    ```bash
-    touch glucose.db
-    ```
-
-3.  **Create a `compose.yaml` file:**
+2.  **Create a `compose.yaml` file:**
     Create a file named `compose.yaml` and paste the following:
 
     ```yaml
@@ -70,49 +64,43 @@ The easiest way to run this is with Docker Compose. You do not need to clone the
           - DEXCOM_OUS=False # Set to True if outside US
           - TZ=America/New_York
         volumes:
-          - ./glucose.db:/app/glucose.db
+          - ./data:/app/data
     ```
 
-4.  **Run it:**
+3.  **Run it:**
     ```bash
     docker compose up -d
     ```
 
-5.  **Access the Dashboard:**
+4.  **Access the Dashboard:**
     Open your browser and go to `http://your-server-ip:5000`
 
- ---
+---
 
 ## 🖥️ Portainer / Dockge
 
 If you use a dashboard like Portainer or Dockge, you can deploy this as a **Stack**.
 
-1.  **Preparation (Crucial):**
-    You must create an empty database file on your server *before* deploying. If you don't, Docker will create a folder named `glucose.db` and the app will crash.
-    ```bash
-    touch /path/to/your/data/glucose.db
-    ```
+**Stack Configuration:**
 
-2.  **Stack Configuration:**
-    Copy this into your Stack editor. Be sure to update the `/path/to/...` to match where you created the file above.
-
-    ```yaml
-    services:
-      dexcom-logger:
-        image: ghcr.io/nuken/dexcom-glucose-logger:latest
-        container_name: dexcom-web
-        restart: unless-stopped
-        ports:
-          - 5000:5000
-        environment:
-          - DEXCOM_USER=your_username
-          - DEXCOM_PASS=your_password
-          - DEXCOM_OUS=False
-          - TZ=America/New_York
-        volumes:
-          # UPDATE THIS PATH to the empty file you created in step 1
-          - /path/to/your/storage:/app/data
-    ```   
+```yaml
+services:
+  dexcom-logger:
+    image: ghcr.io/nuken/dexcom-glucose-logger:latest
+    container_name: dexcom-web
+    restart: unless-stopped
+    ports:
+      - 5000:5000
+    environment:
+      - DEXCOM_USER=your_username
+      - DEXCOM_PASS=your_password
+      - DEXCOM_OUS=False
+      - TZ=America/New_York
+    volumes:
+      # Map a folder on your host to /app/data
+      # The app will automatically create the database file inside this folder.
+      - /path/to/your/storage_folder:/app/data
+```
 
 ---
 
@@ -162,6 +150,7 @@ Contributions, issues, and feature requests are welcome! Feel free to check the 
 ## 📄 License
 
 This project is [MIT](LICENSE) licensed.
+
 
 
 
