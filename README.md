@@ -1,6 +1,6 @@
 # 📈 Dexcom Glucose Logger (G4/G5/G6/G7)
 
-A self-hosted, mobile-friendly dashboard that logs Dexcom G7 glucose readings to a local database.
+A self-hosted, mobile-friendly dashboard that logs Dexcom (G4/G5/G6/G7) glucose readings to a local database.
 
 ![Python](https://img.shields.io/badge/Python-3.9+-blue.svg)
 ![Docker](https://img.shields.io/badge/Docker-Ready-2496ED.svg)
@@ -99,5 +99,6 @@ Contributions, issues, and feature requests are welcome! Feel free to check the 
 ## 📄 License
 
 This project is [MIT](LICENSE) licensed.
+
 
 
