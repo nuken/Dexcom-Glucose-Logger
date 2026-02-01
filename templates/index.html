@@ -184,7 +184,12 @@
         <div class="main-card">
             
             <div class="card-header-custom d-flex justify-content-between align-items-center">
-                <h2 class="m-0">Glucose Log</h2>
+                <div class="d-flex flex-column align-items-start">
+                    <h2 class="m-0">Glucose Log</h2>
+                    <a href="/api/export/health" class="btn btn-primary btn-sm mt-2 no-print" style="border-radius: 8px; font-weight: 600;">
+                        🏥 Health Export (CSV)
+                    </a>
+                </div>
                 
                 <div class="controls-wrapper no-print d-flex align-items-center gap-4">
                     <div class="control-group d-flex align-items-center">
@@ -329,5 +334,6 @@
 </body>
 
 </html>
+
 
 
