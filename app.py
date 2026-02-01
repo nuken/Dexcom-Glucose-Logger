@@ -2,8 +2,10 @@ import os
 import sqlite3
 import threading
 import time
+import csv 
+import io  
 from datetime import datetime, timedelta
-from flask import Flask, render_template, jsonify, request
+from flask import Flask, render_template, jsonify, request, Response 
 from pydexcom import Dexcom
 
 app = Flask(__name__)
@@ -85,6 +87,36 @@ except Exception as e:
     print(f"Startup Error: {e}")
 
 # --- WEB ROUTES ---
+@app.route('/api/export/health')
+def export_health_csv():
+    """Generates a CSV formatted for medical app imports (Dexcom Clarity style)."""
+    try:
+        with sqlite3.connect(DB_FILE) as conn:
+            cursor = conn.cursor()
+            # Medical apps prefer chronological order (ASC)
+            cursor.execute("SELECT time_str, mg_dl, trend FROM readings ORDER BY timestamp ASC")
+            rows = cursor.fetchall()
+
+        output = io.StringIO()
+        writer = csv.writer(output)
+        
+        # Standard headers recognized by Glooko/Tidepool parsers
+        writer.writerow(['Index', 'Timestamp (YYYY-MM-DDThh:mm:ss)', 'Glucose Value (mg/dL)', 'Trend'])
+        
+        for i, row in enumerate(rows):
+            # Convert 'YYYY-MM-DD HH:MM:SS' to ISO 8601 'YYYY-MM-DDTHH:MM:SS'
+            iso_time = row[0].replace(" ", "T")
+            writer.writerow([i, iso_time, row[1], row[2]])
+
+        output.seek(0)
+        return Response(
+            output.getvalue(),
+            mimetype="text/csv",
+            headers={"Content-disposition": "attachment; filename=dexcom_health_export.csv"}
+        )
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+        
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -145,3 +177,4 @@ def get_readings():
 if __name__ == '__main__':
 
     app.run(host='0.0.0.0', port=5000)
+
