@@ -120,7 +120,11 @@ def export_health_csv():
 @app.route('/')
 def index():
     return render_template('index.html')
-
+    
+@app.route('/trends')
+def trends():
+    return render_template('trends.html')
+    
 @app.route('/api/readings')
 def get_readings():
     # --- RATE LIMIT PROTECTION ---
@@ -177,4 +181,5 @@ def get_readings():
 if __name__ == '__main__':
 
     app.run(host='0.0.0.0', port=5000)
+
 
