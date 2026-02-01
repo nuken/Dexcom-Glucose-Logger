@@ -25,9 +25,12 @@ A self-hosted, mobile-friendly dashboard that logs Dexcom (G4/G5/G6/G7) glucose 
 
 ## 🖼️ Screenshots
 
-![Dashboard Screenshot](screenshots/Screenshot.jpeg)
+<p align="center">
+  <img src="screenshots/logs.jpeg" width="45%" alt="Glucose Log View" />
+  <img src="screenshots/trends.jpeg" width="45%" alt="Trends View" />
+</p>
 
-_The dashboard provides a clean, sortable view of your glucose trends, designed to be readable at a glance._
+_Left: The main log providing a clean, sortable history. Right: The new trends dashboard with Time-in-Range visualization._
 
 ---
 
@@ -158,5 +161,6 @@ Contributions, issues, and feature requests are welcome! Feel free to check the 
 ## 📄 License
 
 This project is [MIT](https://www.google.com/search?q=LICENSE) licensed.
+
 
 
