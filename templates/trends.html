@@ -4,164 +4,137 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Glucose Trends</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.3.0/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
     <style>
-        body { background-color: #f0f2f5; font-family: 'Inter', sans-serif; padding: 20px 10px; }
-        .stats-card { border: none; border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); background: #fff; margin-bottom: 20px; padding: 20px; }
-        
-        /* FIX: Prevents selecting the chart like text on mobile */
-        .chart-container { 
-            position: relative; 
-            height: 40vh; 
-            width: 100%; 
-            touch-action: pan-y; /* Allows vertical scrolling but captures horizontal swipes */
-        }
-
-        canvas {
-            -webkit-user-select: none;  /* Safari/Chrome */
-            -moz-user-select: none;     /* Firefox */
-            -ms-user-select: none;      /* IE */
-            user-select: none;          /* Standard */
-            -webkit-tap-highlight-color: transparent; /* Removes blue overlay on tap */
-            outline: none;
-        }
-
-        .range-label { font-size: 0.8rem; font-weight: 600; color: #666; }
+        body { background: #f0f2f5; padding: 20px 10px; font-family: sans-serif; }
+        .stats-card { background: #fff; border-radius: 16px; padding: 20px; margin-bottom: 20px; box-shadow: 0 5px 15px rgba(0,0,0,0.05); }
+        .chart-box { height: 350px; position: relative; }
+        .mini-chart { height: 250px; position: relative; }
     </style>
 </head>
 <body>
-    <div class="container" style="max-width: 900px;">
+    <div class="container" style="max-width: 1100px;">
         <div class="d-flex justify-content-between align-items-center mb-4">
-            <h2 class="fw-bold m-0">Glucose Trends</h2>
-            <a href="/" class="btn btn-outline-secondary btn-sm">Back to Log</a>
+            <h2>📊 Trends Analysis</h2>
+            <div>
+                <a href="/meals" class="btn btn-outline-primary btn-sm">Meal History</a>
+                <a href="/" class="btn btn-outline-secondary btn-sm">Dashboard</a>
+            </div>
         </div>
 
-        <div class="stats-card d-flex gap-3">
-            <select id="timeframe" class="form-select">
-                <option value="1440">24 Hours</option>
-                <option value="10080" selected>7 Days</option>
-                <option value="43200">30 Days</option>
-                <option value="129600">90 Days</option>
-            </select>
+        <div class="stats-card">
+            <div class="d-flex justify-content-between mb-2">
+                <h5>Glucose History & Meals</h5>
+                <select id="timeframe" class="form-select w-auto form-select-sm">
+                    <option value="1440">24 Hours</option>
+                    <option value="10080" selected>7 Days</option>
+                    <option value="43200">30 Days</option>
+                </select>
+            </div>
+            <div class="chart-box"><canvas id="mainChart"></canvas></div>
         </div>
 
         <div class="row">
-            <div class="col-md-8">
+            <div class="col-md-6">
                 <div class="stats-card">
-                    <h6 class="range-label mb-3">GLUCOSE HISTORY (mg/dL)</h6>
-                    <div class="chart-container">
-                        <canvas id="lineChart"></canvas>
-                    </div>
+                    <h5>🍞 Carbs vs. Glucose Rise</h5>
+                    <p class="text-muted small">Do more carbs always equal higher spikes?</p>
+                    <div class="mini-chart"><canvas id="carbChart"></canvas></div>
                 </div>
             </div>
-            <div class="col-md-4">
+            <div class="col-md-6">
                 <div class="stats-card">
-                    <h6 class="range-label mb-3">TIME IN RANGE</h6>
-                    <canvas id="rangeChart"></canvas>
+                    <h5>🎯 Time In Range</h5>
+                    <p class="text-muted small">Target: 70 - 180 mg/dL</p>
+                    <div class="mini-chart"><canvas id="rangeChart"></canvas></div>
                 </div>
             </div>
         </div>
     </div>
 
     <script>
-        let lineChart, rangeChart;
+        let charts = {};
 
-        async function updateCharts() {
-            const minutes = document.getElementById('timeframe').value;
-            // Use existing API: auto-calculate step to keep chart clean
-            const step = minutes > 43200 ? 12 : (minutes > 1440 ? 6 : 1);
-            const res = await fetch(`/api/readings?minutes=${minutes}&step=${step}`);
-            const data = await res.json();
-            
-            const labels = data.map(r => r.time).reverse();
-            const values = data.map(r => r.mg_dl).reverse();
+        async function load() {
+            const mins = document.getElementById('timeframe').value;
+            const step = mins > 43200 ? 12 : (mins > 1440 ? 6 : 1);
 
-            // Calculate Ranges
-            const inRange = values.filter(v => v >= 70 && v <= 180).length;
-            const high = values.filter(v => v > 180).length;
-            const low = values.filter(v => v < 70).length;
+            const [readingsRes, mealsRes] = await Promise.all([
+                fetch(`/api/readings?minutes=${mins}&step=${step}`),
+                fetch('/api/meals')
+            ]);
 
-            renderLineChart(labels, values);
-            renderRangeChart(inRange, high, low);
+            const readings = await readingsRes.json();
+            const allMeals = await mealsRes.json();
+
+            // Filter meals to window
+            const cutoff = new Date(Date.now() - (mins * 60000));
+            const meals = allMeals.filter(m => new Date(m.timestamp) > cutoff);
+
+            renderMainChart(readings, meals);
+            renderRangeChart(readings);
+            renderCarbChart(allMeals); // Use ALL meals for better data points
         }
 
-        function renderLineChart(labels, values) {
-    if(lineChart) lineChart.destroy();
-    const ctx = document.getElementById('lineChart').getContext('2d');
-    
-    lineChart = new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels: labels,
-            datasets: [{
-                label: 'Glucose',
-                data: values,
-                borderColor: '#0047AB',
-                backgroundColor: 'rgba(0, 71, 171, 0.1)',
-                fill: true,
-                tension: 0.4,
-                pointRadius: 0,
-                pointHitRadius: 20, // Makes it easier to trigger tooltips on mobile
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            interaction: {
-                intersect: false, // Allows tooltip to show even if not hovering directly on a point
-                mode: 'index',    // Vertically aligns the tooltip to the nearest X-axis point
-            },
-            plugins: {
-                tooltip: {
-                    enabled: true,
-                    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                    titleColor: '#1a1a1a',
-                    bodyColor: '#1a1a1a',
-                    borderColor: '#ddd',
-                    borderWidth: 1,
-                    padding: 12,
-                    displayColors: false, // Removes the color box for a cleaner look
-                    callbacks: {
-                        label: function(context) {
-                            return `Glucose: ${context.parsed.y} mg/dL`;
-                        }
-                    }
-                }
-            },
-            scales: {
-                x: {
-                    display: false
-                },
-                y: {
-                    beginAtZero: false,
-                    grid: {
-                        color: 'rgba(0,0,0,0.05)'
-                    }
-                }
-            }
-        }
-    });
-}
+        function renderMainChart(readings, meals) {
+            if(charts.main) charts.main.destroy();
+            const mealPoints = meals.map(m => {
+                // Align meal dot to closest glucose reading time
+                const mTime = new Date(m.timestamp).getTime();
+                const closest = readings.reduce((p, c) => Math.abs(new Date(c.timestamp)-mTime) < Math.abs(new Date(p.timestamp)-mTime) ? c : p);
+                return { x: m.timestamp, y: closest ? closest.mg_dl : 100, type: m.type, items: m.items.join(', ') };
+            });
 
-        function renderRangeChart(inRange, high, low) {
-            if(rangeChart) rangeChart.destroy();
-            const ctx = document.getElementById('rangeChart').getContext('2d');
-            rangeChart = new Chart(ctx, {
-                type: 'doughnut',
+            charts.main = new Chart(document.getElementById('mainChart'), {
+                type: 'line',
                 data: {
-                    labels: ['In Range', 'High', 'Low'],
-                    datasets: [{
-                        data: [inRange, high, low],
-                        backgroundColor: ['#28a745', '#ffc107', '#dc3545']
-                    }]
+                    datasets: [
+                        { label: 'Glucose', data: readings.map(r=>({x:r.timestamp, y:r.mg_dl})), borderColor: '#0047AB', backgroundColor: 'rgba(0,71,171,0.1)', fill: true, pointRadius: 0 },
+                        { label: 'Meals', data: mealPoints, type: 'scatter', backgroundColor: '#FF8C00', pointRadius: 6 }
+                    ]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    scales: { x: { type: 'time', time: { displayFormats: { day: 'MMM d' } } } },
+                    plugins: { tooltip: { callbacks: { label: c => c.dataset.type==='scatter' ? `🍽️ ${c.raw.type}: ${c.raw.items}` : `${c.parsed.y} mg/dL` } } }
                 }
             });
         }
 
-        document.getElementById('timeframe').addEventListener('change', updateCharts);
-        updateCharts();
+        function renderRangeChart(readings) {
+            if(charts.range) charts.range.destroy();
+            const vals = readings.map(r => r.mg_dl);
+            const low = vals.filter(v=>v<70).length;
+            const high = vals.filter(v=>v>180).length;
+            const ok = vals.length - low - high;
+
+            charts.range = new Chart(document.getElementById('rangeChart'), {
+                type: 'doughnut',
+                data: { labels: ['Low', 'In Range', 'High'], datasets: [{ data: [low, ok, high], backgroundColor: ['#dc3545', '#28a745', '#ffc107'] }] },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+        }
+
+        function renderCarbChart(meals) {
+            if(charts.carb) charts.carb.destroy();
+            // X: Carbs, Y: Rise. Only use meals with carb data.
+            const data = meals.filter(m => m.carbs > 0).map(m => ({ x: m.carbs, y: m.analysis.rise, items: m.items.join(', ') }));
+
+            charts.carb = new Chart(document.getElementById('carbChart'), {
+                type: 'scatter',
+                data: { datasets: [{ label: 'Meal Impact', data: data, backgroundColor: '#6f42c1' }] },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    scales: { x: { title: {display:true, text:'Carbs (g)'} }, y: { title: {display:true, text:'Glucose Rise (mg/dL)'} } },
+                    plugins: { tooltip: { callbacks: { label: c => `${c.raw.items}: ${c.raw.x}g carbs ➡ +${c.raw.y} mg/dL` } } }
+                }
+            });
+        }
+
+        document.getElementById('timeframe').addEventListener('change', load);
+        load();
     </script>
 </body>
 </html>

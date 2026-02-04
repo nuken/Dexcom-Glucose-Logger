@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Edit Meal</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>body { background-color: #f0f2f5; padding: 20px; }</style>
+</head>
+<body>
+<div class="container" style="max-width: 600px;">
+    <div class="card p-4 shadow-sm border-0">
+        <h3>Edit Meal</h3>
+        <form id="editForm">
+            <div class="mb-3">
+                <label>Date & Time</label>
+                <div class="input-group">
+                    <input type="date" id="date" class="form-control" required>
+                    <input type="time" id="time" class="form-control" required>
+                </div>
+            </div>
+            <div class="mb-3">
+                <label>Type</label>
+                <select id="type" class="form-select">
+                    <option>Breakfast</option><option>Lunch</option><option>Dinner</option><option>Snack</option>
+                </select>
+            </div>
+            <div class="mb-3">
+                <label>Food Items (comma separated)</label>
+                <input type="text" id="items" class="form-control">
+            </div>
+            <div class="row mb-3">
+                <div class="col"><label>Carbs (g)</label><input type="number" id="carbs" class="form-control"></div>
+                <div class="col"><label>Notes</label><input type="text" id="notes" class="form-control"></div>
+            </div>
+            <button type="submit" class="btn btn-primary w-100">Update Meal</button>
+            <a href="/meals" class="btn btn-link w-100 mt-2 text-muted">Cancel</a>
+        </form>
+    </div>
+</div>
+<script>
+    const mealId = {{ meal_id }};
+
+    // Load existing data
+    fetch(`/api/meals/${mealId}`).then(r => r.json()).then(data => {
+        const dt = new Date(data.timestamp);
+        document.getElementById('date').value = dt.toISOString().split('T')[0];
+        document.getElementById('time').value = dt.toTimeString().substr(0,5);
+        document.getElementById('type').value = data.meal_type;
+        document.getElementById('items').value = JSON.parse(data.items).join(', ');
+        document.getElementById('carbs').value = data.carbs;
+        document.getElementById('notes').value = data.notes;
+    });
+
+    document.getElementById('editForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const items = document.getElementById('items').value.split(',').map(s=>s.trim()).filter(s=>s);
+        const ts = `${document.getElementById('date').value}T${document.getElementById('time').value}:00`;
+
+        await fetch(`/api/meals/${mealId}`, {
+            method: 'PUT',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                timestamp: ts,
+                meal_type: document.getElementById('type').value,
+                items: items,
+                carbs: document.getElementById('carbs').value,
+                notes: document.getElementById('notes').value
+            })
+        });
+        window.location.href = '/meals';
+    });
+</script>
+</body>
+</html>

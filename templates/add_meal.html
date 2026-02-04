@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Log Meal</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <style>
+        body { background-color: #f0f2f5; font-family: 'Inter', sans-serif; padding: 20px 10px; }
+        .main-card {
+            border: none;
+            border-radius: 16px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.05);
+            background: #fff;
+            padding: 25px;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        .form-label { font-weight: 600; font-size: 0.9rem; color: #555; }
+        .btn-primary { background-color: #0047AB; border: none; font-weight: 600; padding: 12px; }
+        .btn-primary:hover { background-color: #003580; }
+        .btn-outline-secondary { border-color: #ddd; color: #666; }
+
+        /* Mobile Tweaks */
+        .food-item-row { margin-bottom: 10px; }
+        .remove-btn { color: #dc3545; cursor: pointer; font-size: 1.2rem; line-height: 1; padding: 0 10px; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <div class="main-card">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2 class="fw-bold m-0">Log Meal</h2>
+                <a href="/" class="btn btn-outline-secondary btn-sm">Cancel</a>
+            </div>
+
+            <form id="mealForm">
+                <div class="row g-2 mb-3">
+                    <div class="col-12">
+                        <label class="form-label">When did you eat?</label>
+                    </div>
+                    <div class="col-7">
+                        <input type="date" id="dateInput" class="form-control form-control-lg" required>
+                    </div>
+                    <div class="col-5">
+                        <input type="time" id="timeInput" class="form-control form-control-lg" required>
+                    </div>
+                    <div class="col-12">
+                        <button type="button" class="btn btn-light w-100 text-primary fw-bold btn-sm border" onclick="setNow()">
+                            🕒 Set to Now
+                        </button>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Meal Type</label>
+                    <select id="mealType" class="form-select form-select-lg">
+                        <option value="Breakfast">Breakfast</option>
+                        <option value="Lunch">Lunch</option>
+                        <option value="Dinner">Dinner</option>
+                        <option value="Snack">Snack</option>
+                    </select>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">What did you eat?</label>
+                    <div id="foodList">
+                        </div>
+                    <button type="button" class="btn btn-outline-primary w-100 mt-2 dashed-border" onclick="addFoodItem()">
+                        + Add Item
+                    </button>
+                </div>
+
+                <div class="row g-2 mb-4">
+                    <div class="col-4">
+                        <label class="form-label">Carbs (g)</label>
+                        <input type="number" id="carbsInput" class="form-control" placeholder="Optional">
+                    </div>
+                    <div class="col-8">
+                        <label class="form-label">Notes</label>
+                        <input type="text" id="notesInput" class="form-control" placeholder="Restaurant, mood, etc.">
+                    </div>
+                </div>
+
+                <button type="submit" class="btn btn-primary w-100 btn-lg shadow-sm">Save Meal</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // 1. Initialize with "Now" and one empty food item
+        document.addEventListener('DOMContentLoaded', () => {
+            setNow();
+            addFoodItem();
+        });
+
+        // 2. "Set to Now" Logic
+        function setNow() {
+            const now = new Date();
+            // Format Date: YYYY-MM-DD
+            const dateStr = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
+            // Format Time: HH:MM
+            const timeStr = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+
+            document.getElementById('dateInput').value = dateStr;
+            document.getElementById('timeInput').value = timeStr;
+        }
+
+        // 3. Dynamic Food Items
+        function addFoodItem() {
+            const container = document.getElementById('foodList');
+            const div = document.createElement('div');
+            div.className = 'input-group food-item-row';
+            div.innerHTML = `
+                <input type="text" class="form-control food-input" placeholder="e.g. 2 Eggs, Toast" required>
+                <button class="btn btn-outline-danger" type="button" onclick="this.parentElement.remove()">✕</button>
+            `;
+            container.appendChild(div);
+            // Focus the new input
+            div.querySelector('input').focus();
+        }
+
+        // 4. Handle Form Submission
+        document.getElementById('mealForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            // Collect Food Items
+            const items = [];
+            document.querySelectorAll('.food-input').forEach(input => {
+                if(input.value.trim()) items.push(input.value.trim());
+            });
+
+            // Construct Timestamp (ISO Format)
+            const dateVal = document.getElementById('dateInput').value;
+            const timeVal = document.getElementById('timeInput').value;
+            const timestamp = `${dateVal}T${timeVal}:00`;
+
+            const payload = {
+                timestamp: timestamp,
+                meal_type: document.getElementById('mealType').value,
+                items: items,
+                carbs: document.getElementById('carbsInput').value || null,
+                notes: document.getElementById('notesInput').value
+            };
+
+            try {
+                const res = await fetch('/api/meals', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (res.ok) {
+                    // Redirect to the Dashboard (or the Meal History page we will build next)
+                    window.location.href = '/';
+                } else {
+                    alert('Error saving meal');
+                }
+            } catch (err) {
+                alert('Connection error: ' + err);
+            }
+        });
+    </script>
+</body>
+</html>

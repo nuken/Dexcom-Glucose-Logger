@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Meal History</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { background: #f0f2f5; padding: 20px 10px; font-family: sans-serif; }
+        .meal-card { background: #fff; border-radius: 12px; padding: 15px; margin-bottom: 15px; border-left: 5px solid #ccc; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        .border-good { border-left-color: #28a745; }
+        .border-warn { border-left-color: #ffc107; }
+        .border-bad { border-left-color: #dc3545; }
+        .timeline-strip { display: flex; justify-content: space-between; background: #f8f9fa; padding: 8px; border-radius: 6px; font-size: 0.8rem; margin-top: 10px; }
+        .btn-icon { cursor: pointer; opacity: 0.6; padding: 0 5px; }
+        .btn-icon:hover { opacity: 1; }
+    </style>
+</head>
+<body>
+<div class="container" style="max-width: 800px;">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="m-0">Meal History</h2>
+        <div>
+            <a href="/api/export/meals" class="btn btn-primary btn-sm">⬇ CSV Export</a>
+            <a href="/" class="btn btn-outline-secondary btn-sm">Back</a>
+        </div>
+    </div>
+
+    <div class="row g-2 mb-4">
+        <div class="col-8"><input type="text" id="search" class="form-control" placeholder="Search food..."></div>
+        <div class="col-4">
+            <select id="sort" class="form-select">
+                <option value="date">Latest</option>
+                <option value="rise_desc">Bad Spikes</option>
+                <option value="rise_asc">Stable Meals</option>
+            </select>
+        </div>
+    </div>
+
+    <div id="list"></div>
+</div>
+
+<script>
+    let meals = [];
+    async function load() {
+        const res = await fetch('/api/meals');
+        meals = await res.json();
+        render();
+    }
+
+    async function deleteMeal(id) {
+        if(!confirm("Delete this meal?")) return;
+        await fetch(`/api/meals/${id}`, { method: 'DELETE' });
+        load();
+    }
+
+    function render() {
+        const q = document.getElementById('search').value.toLowerCase();
+        const sort = document.getElementById('sort').value;
+
+        let show = meals.filter(m => JSON.stringify(m).toLowerCase().includes(q));
+        show.sort((a,b) => sort === 'date' ? new Date(b.timestamp)-new Date(a.timestamp) :
+                           sort === 'rise_desc' ? b.analysis.rise - a.analysis.rise : a.analysis.rise - b.analysis.rise);
+
+        document.getElementById('list').innerHTML = show.map(m => {
+            const rise = m.analysis.rise;
+            const border = rise > 60 ? 'border-bad' : (rise > 30 ? 'border-warn' : 'border-good');
+            const timeline = m.analysis.timeline.map(t => `<div><div class="text-muted" style="font-size:0.7em">T+${t.min}</div><strong>${t.val}</strong></div>`).join('');
+
+            return `
+            <div class="meal-card ${border}">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <span class="fw-bold text-primary">${m.type}</span>
+                        <span class="text-muted small ms-2">${m.time_str}</span>
+                    </div>
+                    <div>
+                        <span class="btn-icon" onclick="location.href='/edit-meal/${m.id}'">✏️</span>
+                        <span class="btn-icon text-danger" onclick="deleteMeal(${m.id})">🗑️</span>
+                    </div>
+                </div>
+                <div class="my-2">${m.items.map(i => `<span class="badge bg-light text-dark border me-1">${i}</span>`).join('')}</div>
+                <div class="small text-muted mb-2">Carbs: ${m.carbs || '--'}g • Rise: <strong>+${rise}</strong> mg/dL</div>
+                <div class="timeline-strip text-center">${timeline}</div>
+            </div>`;
+        }).join('');
+    }
+
+    document.getElementById('search').addEventListener('input', render);
+    document.getElementById('sort').addEventListener('change', render);
+    load();
+</script>
+</body>
+</html>

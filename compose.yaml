@@ -4,17 +4,17 @@ services:
     container_name: dexcom-web
     restart: unless-stopped
     ports:
-      - 5000:5000
+      - 8095:5000
     environment:
       - DEXCOM_USER=your_username_here
       - DEXCOM_PASS=your_password_here
-      - DEXCOM_OUS=False # Set to True if outside US
+      - DEXCOM_OUS=False
       - TZ=America/New_York
+    # ADD THIS SECTION BELOW:
     volumes:
       - ./:/app
     networks:
       - dexcom-net
-
 networks:
   dexcom-net:
-    driver: bridge  
+    driver: bridge

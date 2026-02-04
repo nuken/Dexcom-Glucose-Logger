@@ -4,245 +4,100 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Dexcom Glucose Log</title>
-    
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
-    
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.datatables.net/1.13.4/css/dataTables.bootstrap5.min.css" rel="stylesheet">
     <link href="https://cdn.datatables.net/buttons/2.3.6/css/buttons.bootstrap5.min.css" rel="stylesheet">
-    
     <style>
-        :root {
-            --bg-color: #f0f2f5;
-            --card-radius: 16px;
-            --primary-color: #0047AB;
-            --arrow-bg: #eef2f6;
-            --text-dark: #2c3e50;
-        }
+        :root { --bg-color: #f0f2f5; --card-radius: 16px; --primary-color: #0047AB; --arrow-bg: #eef2f6; --text-dark: #2c3e50; }
+        body { background-color: var(--bg-color); font-family: 'Inter', sans-serif; color: #333; padding: 20px 10px; }
+        .main-card { border: none; border-radius: var(--card-radius); box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05); overflow: hidden; background: #fff; }
+        .card-header-custom { padding: 25px; background: #fff; border-bottom: 1px solid #eee; }
+        h2 { font-weight: 700; color: #1a1a1a; font-size: 1.5rem; }
+        .glucose-wrapper { display: flex; align-items: center; gap: 12px; }
+        .glucose-val { font-weight: 700; font-size: 1.2rem; color: var(--text-dark); line-height: 1; }
+        .unit-label { font-size: 0.75rem; color: #888; font-weight: 400; }
+        .arrow-badge { display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; background-color: var(--arrow-bg); border-radius: 50%; font-size: 1.2rem; font-weight: bold; color: var(--primary-color); padding-bottom: 3px; }
 
-        body {
-            background-color: var(--bg-color);
-            font-family: 'Inter', sans-serif;
-            color: #333;
-            padding: 20px 10px;
-        }
-
-        /* CARD DESIGN */
-        .main-card {
-            border: none;
-            border-radius: var(--card-radius);
-            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05);
-            overflow: hidden;
-            background: #fff;
-        }
-
-        .card-header-custom {
-            padding: 25px;
-            background: #fff;
-            border-bottom: 1px solid #eee;
-        }
-
-        h2 {
-            font-weight: 700;
-            color: #1a1a1a;
+        /* Clean Icons (No Background) */
+        .export-btn-round {
+            background: transparent !important;
+            border: none !important;
+            box-shadow: none !important;
+            color: #6c757d !important;
             font-size: 1.5rem;
-        }
-
-        /* --- BUTTON FIX --- */
-        .dt-buttons .btn {
-            color: #555 !important;
-            border-color: #ccc !important;
-            background-color: #fff !important;
-            font-size: 0.85rem;
-            font-weight: 600;
-            padding: 6px 12px;
-            margin-right: 5px;
-        }
-        .dt-buttons .btn:hover {
-            background-color: #f0f0f0 !important;
-            color: #000 !important;
-            border-color: #999 !important;
-        }
-
-        /* DROPDOWNS */
-        .control-label {
-            font-size: 0.75rem;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            color: #888;
-            font-weight: 600;
-            margin-right: 8px;
-        }
-
-        .form-select {
-            border-radius: 8px;
-            border: 1px solid #e0e0e0;
-            font-size: 0.9rem;
-            background-color: #f9f9f9;
-            cursor: pointer;
-        }
-
-        /* TABLE STYLING */
-        .table-responsive { padding: 0; margin: 0; }
-        
-        table.dataTable {
-            border-collapse: separate;
-            border-spacing: 0;
-            width: 100% !important;
-            margin-top: 0 !important;
-        }
-
-        table.dataTable thead th {
-            background-color: #f8f9fa;
-            border-bottom: 2px solid #eee !important;
-            font-weight: 600;
-            font-size: 0.85rem;
-            text-transform: uppercase;
-            color: #666;
-            padding: 15px;
-        }
-
-        table.dataTable tbody td {
-            padding: 12px 15px;
-            vertical-align: middle;
-            border-bottom: 1px solid #f0f0f0;
-            font-size: 0.95rem;
-        }
-
-        /* GLUCOSE COLUMN STYLES */
-        .glucose-wrapper {
-            display: flex;
+            padding: 0 10px !important;
+            margin-left: 0;
+            transition: color 0.2s ease;
+            display: inline-flex !important;
             align-items: center;
-            gap: 12px;
+        }
+        .export-btn-round:hover {
+            color: #0047AB !important;
+            background: transparent !important;
+            box-shadow: none !important;
         }
 
-        .glucose-val {
-            font-weight: 700;
-            font-size: 1.2rem;
-            color: var(--text-dark);
-            line-height: 1;
-        }
-        
-        .unit-label {
-            font-size: 0.75rem;
-            color: #888;
-            font-weight: 400;
-        }
-
-        /* ARROW BADGE */
-        .arrow-badge {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            width: 32px;
-            height: 32px;
-            background-color: var(--arrow-bg);
-            border-radius: 50%;
-            font-size: 1.2rem;
-            font-weight: bold;
-            color: var(--primary-color);
-            line-height: 0;
-            padding-bottom: 3px; 
-        }
-
-        /* MOBILE OPTIMIZATIONS */
+        /* Mobile Layout Tweaks */
         @media (max-width: 768px) {
-            .card-header-custom {
-                flex-direction: column;
-                align-items: flex-start !important;
-                gap: 15px;
-            }
-            .controls-wrapper {
-                width: 100%;
-                flex-direction: column;
-                gap: 10px !important;
-            }
-            .control-group {
-                display: flex;
-                align-items: center;
-                justify-content: space-between;
-                width: 100%;
-            }
-            .form-select { width: 60% !important; }
-            
-            table.dataTable tbody td, table.dataTable thead th {
-                padding: 12px 10px;
-            }
+            .card-header-custom { flex-direction: column; align-items: flex-start !important; gap: 15px; }
+            .controls-wrapper { width: 100%; flex-direction: row; flex-wrap: wrap; gap: 15px !important; justify-content: space-between; }
+            .control-group { flex: 1; min-width: 120px; }
+            .form-select { width: 100% !important; }
         }
 
         @media print {
-            body { background: white; padding: 0; }
-            .main-card { box-shadow: none; border-radius: 0; }
             .no-print { display: none !important; }
-            .arrow-badge { border: 1px solid #ddd; }
+            body { background: white; padding: 0; }
+            .main-card { box-shadow: none; }
         }
     </style>
 </head>
 <body>
-
     <div class="container" style="max-width: 800px;">
         <div class="main-card">
-            
             <div class="card-header-custom d-flex justify-content-between align-items-center">
-                <div class="d-flex flex-column align-items-start">
+                <div class="d-flex flex-column align-items-start w-100">
                     <h2 class="m-0">Glucose Log</h2>
-                    <a href="/api/export/health" class="btn btn-primary btn-sm mt-2 no-print" style="border-radius: 8px; font-weight: 600;">
-                        🏥 Health Export (CSV)
-                    </a>
-					<a href="/trends" class="btn btn-outline-primary btn-sm mt-2 no-print" style="border-radius: 8px; font-weight: 600; margin-left: 5px;">
-    📊 View Trends
-</a>
+
+                    <div class="mt-3 no-print d-flex flex-wrap gap-2 w-100">
+                        <a href="/api/export/health" class="btn btn-primary btn-sm fw-bold rounded-3" style="border-radius: 8px;">🏥 Export</a>
+                        <a href="/add-meal" class="btn btn-success btn-sm fw-bold rounded-3" style="border-radius: 8px;">🍽️ Log Meal</a>
+                        <a href="/meals" class="btn btn-outline-primary btn-sm fw-bold rounded-3" style="border-radius: 8px;">📂 History</a>
+                        <a href="/trends" class="btn btn-outline-secondary btn-sm fw-bold rounded-3" style="border-radius: 8px;">📊 Trends</a>
+                    </div>
                 </div>
-                
-                <div class="controls-wrapper no-print d-flex align-items-center gap-4">
-                    <div class="control-group d-flex align-items-center">
-                        <label class="control-label">History</label>
+
+                <div class="controls-wrapper no-print d-flex align-items-center gap-4 mt-3 mt-md-0">
+                    <div class="control-group">
+                        <label class="fw-bold text-muted d-block mb-1" style="font-size: 0.85rem;">HISTORY</label>
                         <select id="historySelect" class="form-select w-auto">
                             <option value="1440" selected>24 Hours</option>
-                            <option value="2880">48 Hours</option>
                             <option value="4320">3 Days</option>
                             <option value="10080">7 Days</option>
                             <option value="43200">30 Days</option>
-                            <option value="86400">60 Days</option>
-                            <option value="129600">90 Days</option>
-                            <option value="525600">1 Year</option>
                         </select>
                     </div>
-
-                    <div class="control-group d-flex align-items-center">
-                        <label class="control-label">Interval</label>
+                    <div class="control-group">
+                        <label class="fw-bold text-muted d-block mb-1" style="font-size: 0.85rem;">STEP</label>
                         <select id="intervalSelect" class="form-select w-auto">
-                            <option value="1">All (5m)</option>
-                            <option value="3" selected>15 Mins</option>
-                            <option value="6">30 Mins</option>
-                            <option value="12">1 Hour</option>
+                            <option value="1">All</option>
+                            <option value="3" selected>15m</option>
+                            <option value="6">30m</option>
                         </select>
                     </div>
                 </div>
             </div>
-            
-            <div id="loading" class="text-center py-5">
-                <div class="spinner-border text-primary" role="status"></div>
-                <p class="mt-3 text-muted small">Syncing data...</p>
-            </div>
+
+            <div id="loading" class="text-center py-5"><div class="spinner-border text-primary"></div><p class="mt-3 text-muted small">Syncing...</p></div>
 
             <div class="table-responsive">
-                <table id="glucoseTable" class="table" style="width:100%; display:none;">
-                    <thead>
-                        <tr>
-                            <th style="width: 35%">Time</th>
-                            <th style="width: 35%">Glucose</th>
-                            <th style="width: 30%">Trend</th>
-                        </tr>
-                    </thead>
-                    <tbody></tbody>
+                <table id="glucoseTable" class="table mt-3" style="width:100%; display:none;">
+                    <thead><tr><th>Time</th><th>Glucose</th><th>Trend</th></tr></thead><tbody></tbody>
                 </table>
             </div>
         </div>
-        
-        <div class="text-center mt-3 no-print">
-            <small class="text-muted">Nuken &bull; Dexcom (G4/G5/G6/G7)</small>
-        </div>
+        <div class="text-center mt-3 no-print"><small class="text-muted">Nuken &bull; Dexcom</small></div>
     </div>
 
     <script src="https://code.jquery.com/jquery-3.5.1.js"></script>
@@ -251,8 +106,6 @@
     <script src="https://cdn.datatables.net/buttons/2.3.6/js/dataTables.buttons.min.js"></script>
     <script src="https://cdn.datatables.net/buttons/2.3.6/js/buttons.bootstrap5.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.1.3/jszip.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.53/pdfmake.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.53/vfs_fonts.js"></script>
     <script src="https://cdn.datatables.net/buttons/2.3.6/js/buttons.html5.min.js"></script>
     <script src="https://cdn.datatables.net/buttons/2.3.6/js/buttons.print.min.js"></script>
 
@@ -260,75 +113,44 @@
         $(document).ready(function() {
             var table = $('#glucoseTable').DataTable({
                 columns: [
-                    { 
-                        data: 'timestamp', 
-                        render: function(data, type, row) {
-                            if (type === 'display' || type === 'filter') {
-                                return row.time; 
-                            }
-                            return data;
-                        }
-                    },
-                    { 
-                        data: 'mg_dl',
-                        render: function(data, type, row) {
-                            if (type === 'sort' || type === 'type') {
-                                return data;
-                            }
-                            return `
-                                <div class="glucose-wrapper">
-                                    <div class="arrow-badge">${row.trend_arrow}</div>
-                                    <div>
-                                        <div class="glucose-val">${data}</div>
-                                        <div class="unit-label">mg/dL</div>
-                                    </div>
-                                </div>
-                            `;
-                        }
-                    },
+                    { data: 'timestamp', render: (d, t, r) => (t === 'display') ? r.time : d },
+                    { data: 'mg_dl', render: (d, t, r) => (t === 'sort') ? d : `<div class="glucose-wrapper"><div class="arrow-badge">${r.trend_arrow}</div><div><div class="glucose-val">${d}</div><div class="unit-label">mg/dL</div></div></div>` },
                     { data: 'trend' }
                 ],
                 order: [[ 0, "desc" ]],
-                dom: 'Brtip',
-                buttons: [ 
-                    { extend: 'print', text: 'Print Log', className: 'btn btn-outline-secondary' },
-                    { extend: 'excel', text: 'Export Excel', className: 'btn btn-outline-secondary' }
-                ],
-                pageLength: 50,
-                pagingType: "simple_numbers",
-                language: {
-                    paginate: {
-                        next: '›',
-                        previous: '‹'
+                pageLength: 20,
+                lengthMenu: [[10, 20, 50, -1], [10, 20, 50, "All"]],
+                dom: '<"d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2"Bf>rtip',
+                buttons: [
+                    {
+                        extend: 'print',
+                        text: '🖨️',
+                        className: 'export-btn-round',
+                        title: 'Glucose Report',
+                        attr: { title: 'Print Report' }
+                    },
+                    {
+                        extend: 'excel',
+                        text: '📊',
+                        className: 'export-btn-round',
+                        attr: { title: 'Export to Excel' }
                     }
+                ],
+                language: {
+                    search: "_INPUT_",
+                    searchPlaceholder: "Search readings..."
                 }
             });
 
             function loadData() {
-                $('#loading').show();
-                $('#glucoseTable_wrapper').hide();
-                
-                var step = $('#intervalSelect').val();
-                var minutes = $('#historySelect').val();
-
-                $.getJSON('/api/readings?step=' + step + '&minutes=' + minutes, function(data) {
-                    table.clear();
-                    table.rows.add(data);
-                    table.draw();
-                    
-                    $('#loading').hide();
-                    $('#glucoseTable').show();
-                    $('#glucoseTable_wrapper').show();
-                }).fail(function(jqXHR) {
-                    $('#loading').html('<div class="alert alert-danger m-3">Error: ' + jqXHR.responseJSON.error + '</div>');
+                $('#loading').show(); $('#glucoseTable_wrapper').hide();
+                $.getJSON('/api/readings?step='+$('#intervalSelect').val()+'&minutes='+$('#historySelect').val(), function(data) {
+                    table.clear().rows.add(data).draw();
+                    $('#loading').hide(); $('#glucoseTable').show(); $('#glucoseTable_wrapper').show();
                 });
             }
-
             loadData();
-
-            $('#intervalSelect, #historySelect').change(function() {
-                loadData();
-            });
+            $('#intervalSelect, #historySelect').change(loadData);
         });
     </script>
 </body>
