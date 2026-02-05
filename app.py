@@ -6,7 +6,7 @@ import io
 import json
 import re
 import requests
-import math  # <--- NEW IMPORT
+import math
 from datetime import datetime, timedelta
 from flask import Flask, render_template, jsonify, request, Response 
 from pydexcom import Dexcom
@@ -26,13 +26,20 @@ if USDA_API_KEY == 'your_key_here' or not USDA_API_KEY:
     USDA_API_KEY = 'DEMO_KEY'
 
 last_sync_time = 0
-SYNC_COOLDOWN = 60 # Check at most once per minute
+SYNC_COOLDOWN = 60 
 
-# --- HELPER: TIME PARSING ---
+# --- HELPER: TIME PARSING (OPTIMIZED) ---
 def parse_db_time(time_val):
     if isinstance(time_val, datetime): return time_val
     if not isinstance(time_val, str): return datetime.now()
     
+    # 1. FAST PATH: Try standard DB format first (Huge speedup for large datasets)
+    try:
+        return datetime.strptime(time_val, '%Y-%m-%d %H:%M:%S')
+    except ValueError:
+        pass
+
+    # 2. SLOW PATH: Regex for other formats (ISO, timezone, etc)
     match = re.match(r'(\d{4}-\d{2}-\d{2})[T ](\d{2}:\d{2}:\d{2})(?:\.(\d+))?([+-]\d{2}:?\d{2}|Z)?', time_val)
     if match:
         date_part, time_part, micro_part, tz_part = match.groups()
@@ -45,6 +52,7 @@ def parse_db_time(time_val):
         try: return datetime.fromisoformat(iso_str)
         except: pass
 
+    # 3. Fallback
     try:
         clean_time = time_val.split('.')[0].split('+')[0].split('-')[0]
         return datetime.strptime(clean_time.strip(), '%Y-%m-%d %H:%M:%S')
@@ -82,17 +90,13 @@ def get_last_reading_time():
 # --- SYNC LOGIC ---
 def smart_sync():
     global last_sync_time
-    
-    # 1. Rate Limit (In-Memory)
-    if time.time() - last_sync_time < SYNC_COOLDOWN:
-        return
+    if time.time() - last_sync_time < SYNC_COOLDOWN: return
 
     try:
         print("Checking Dexcom sync...")
         last_db_time = get_last_reading_time()
         
         if not last_db_time:
-            # FIX: Dexcom API limit is 1440 minutes (24 hours) per request
             minutes_to_fetch = 1440 
         else:
             now = datetime.now()
@@ -116,12 +120,10 @@ def smart_sync():
     except Exception as e:
         print(f"Sync Failed: {e}")
 
-try:
-    init_db()
+try: init_db()
 except: pass
 
 # --- ROUTES ---
-
 @app.route('/')
 def index(): return render_template('index.html')
 
@@ -132,13 +134,10 @@ def trends(): return render_template('trends.html')
 def add_meal_page(): return render_template('add_meal.html')
 
 @app.route('/edit-meal/<int:meal_id>')
-def edit_meal_page(meal_id):
-    return render_template('edit_meal.html', meal_id=meal_id)
+def edit_meal_page(meal_id): return render_template('edit_meal.html', meal_id=meal_id)
 
 @app.route('/meals')
 def meals_page(): return render_template('meals.html')
-
-# --- MEAL API ---
 
 @app.route('/api/meals', methods=['GET', 'POST'])
 def handle_meals():
@@ -210,19 +209,15 @@ def single_meal_ops(meal_id):
             row = conn.execute("SELECT * FROM meals WHERE id = ?", (meal_id,)).fetchone()
             if not row: return jsonify({'error': 'Not found'}), 404
             return jsonify(dict(row))
-            
         if request.method == 'DELETE':
             conn.execute("DELETE FROM meals WHERE id = ?", (meal_id,))
             return jsonify({'success': True})
-            
         if request.method == 'PUT':
             data = request.json
             dt = datetime.fromisoformat(data['timestamp'].replace('Z', '+00:00'))
             items_json = json.dumps(data.get('items', []))
-            conn.execute("""
-                UPDATE meals SET timestamp=?, meal_type=?, items=?, carbs=?, notes=?
-                WHERE id=?
-            """, (dt, data['meal_type'], items_json, data.get('carbs'), data.get('notes'), meal_id))
+            conn.execute("UPDATE meals SET timestamp=?, meal_type=?, items=?, carbs=?, notes=? WHERE id=?", 
+                (dt, data['meal_type'], items_json, data.get('carbs'), data.get('notes'), meal_id))
             return jsonify({'success': True})
 
 @app.route('/api/calculate-carbs', methods=['POST'])
@@ -236,24 +231,15 @@ def calculate_carbs():
         try:
             r = requests.get(url, timeout=5)
             if r.status_code == 429:
-                return jsonify({'error': 'Rate limit exceeded. Please get a free API key at fdc.nal.usda.gov'}), 429
-            
+                return jsonify({'error': 'Rate limit exceeded. Please get a free API key.'}), 429
             data = r.json()
             if data.get('foods'):
-                food = data['foods'][0]
-                nutrients = food.get('foodNutrients', [])
-                carb_val = 0
-                for n in nutrients:
-                    if "Carbohydrate" in n.get('nutrientName', ''):
-                        carb_val = n.get('value', 0)
-                        break
+                nutrients = data['foods'][0].get('foodNutrients', [])
+                carb_val = next((n['value'] for n in nutrients if "Carbohydrate" in n.get('nutrientName', '')), 0)
                 total_carbs += carb_val
-        except Exception as e:
-            print(f"Error looking up {item}: {e}")
-            continue
+        except: continue
             
     return jsonify({
-        # Round up to the nearest whole number for safer bolusing
         'total_carbs': int(math.ceil(total_carbs)), 
         'is_demo': using_demo
     })
@@ -261,12 +247,10 @@ def calculate_carbs():
 @app.route('/api/readings')
 def get_readings():
     smart_sync()
-        
     try:
         step = int(request.args.get('step', 1))
         minutes = int(request.args.get('minutes', 1440))
         target_interval = 0 if step == 1 else (step * 5)
-        
         cutoff = datetime.now() - timedelta(minutes=minutes)
         
         data = []
