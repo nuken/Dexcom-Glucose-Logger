@@ -164,6 +164,7 @@ You can configure the application using environment variables in `compose.yaml`:
 | `DEXCOM_PASS` | **Required.** Your Dexcom account password. | `None` |
 | `DEXCOM_OUS` | Set to `True` if you live outside the US (International Account). | `False` |
 | `USDA_API_KEY`| **Optional.** Key for carb lookups. | `DEMO_KEY` |
+| `ARCHIVE_DAYS`| **Optional.** Move data older than this to CSV archive (set `0` to disable). | `90` |
 | `TZ` | Sets the timezone for the logs (e.g., `America/New_York`). | `UTC` |
 
 ---
@@ -202,6 +203,7 @@ Contributions, issues, and feature requests are welcome! Feel free to check the 
 ## 📄 License
 
 This project is [MIT](https://www.google.com/search?q=LICENSE) licensed.
+
 
 
 
