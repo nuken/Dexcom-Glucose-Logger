@@ -1,6 +1,7 @@
 import os
 import sqlite3
 import time
+import threading  # Added for background syncing
 import csv 
 import io  
 import json
@@ -25,21 +26,23 @@ USDA_API_KEY = os.environ.get('USDA_API_KEY', 'DEMO_KEY')
 if USDA_API_KEY == 'your_key_here' or not USDA_API_KEY:
     USDA_API_KEY = 'DEMO_KEY'
 
+# --- SYNC GLOBALS ---
 last_sync_time = 0
 SYNC_COOLDOWN = 60 
+is_syncing = False  # Flag to prevent overlapping syncs
 
 # --- HELPER: TIME PARSING (OPTIMIZED) ---
 def parse_db_time(time_val):
     if isinstance(time_val, datetime): return time_val
     if not isinstance(time_val, str): return datetime.now()
     
-    # 1. FAST PATH: Try standard DB format first (Huge speedup for large datasets)
+    # 1. FAST PATH: Try standard DB format first
     try:
         return datetime.strptime(time_val, '%Y-%m-%d %H:%M:%S')
     except ValueError:
         pass
 
-    # 2. SLOW PATH: Regex for other formats (ISO, timezone, etc)
+    # 2. SLOW PATH: Regex for other formats
     match = re.match(r'(\d{4}-\d{2}-\d{2})[T ](\d{2}:\d{2}:\d{2})(?:\.(\d+))?([+-]\d{2}:?\d{2}|Z)?', time_val)
     if match:
         date_part, time_part, micro_part, tz_part = match.groups()
@@ -81,19 +84,18 @@ def save_readings_to_db(readings):
 def get_last_reading_time():
     try:
         with sqlite3.connect(DB_FILE) as conn:
-            row = conn.execute("SELECT timestamp FROM readings ORDER BY timestamp DESC LIMIT 1").fetchone()
+            # OPTIMIZED: Sort by time_str (indexed) instead of timestamp
+            row = conn.execute("SELECT timestamp FROM readings ORDER BY time_str DESC LIMIT 1").fetchone()
             if row:
                 return parse_db_time(row[0])
     except: pass
     return None
 
-# --- SYNC LOGIC ---
-def smart_sync():
-    global last_sync_time
-    if time.time() - last_sync_time < SYNC_COOLDOWN: return
-
+# --- SYNC LOGIC (BACKGROUND) ---
+def background_sync_task():
+    global last_sync_time, is_syncing
     try:
-        print("Checking Dexcom sync...")
+        print("Starting background sync...")
         last_db_time = get_last_reading_time()
         
         if not last_db_time:
@@ -119,6 +121,19 @@ def smart_sync():
         
     except Exception as e:
         print(f"Sync Failed: {e}")
+    finally:
+        is_syncing = False
+
+def smart_sync():
+    global last_sync_time, is_syncing
+    # If currently syncing OR cooldown is active, skip
+    if is_syncing or (time.time() - last_sync_time < SYNC_COOLDOWN):
+        return
+
+    # Start sync in background thread
+    is_syncing = True
+    thread = threading.Thread(target=background_sync_task)
+    thread.start()
 
 try: init_db()
 except: pass

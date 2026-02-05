@@ -12,13 +12,13 @@ services:
       - DEXCOM_OUS=False
       - PYTHONUNBUFFERED=1
       - TZ=America/New_York
-    # ADD THIS SECTION BELOW:
+    
     volumes:
       - ./:/app
     networks:
       - dexcom-net
-    # Force single worker to prevent race conditions during sync
-    command: gunicorn -k gthread -w 4 --timeout 120 -b 0.0.0.0:5000 app:app
+    
+    command: gunicorn -k gthread -w 1 --threads 4 --timeout 120 -b 0.0.0.0:5000 app:app
     
 networks:
   dexcom-net:
