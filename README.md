@@ -83,6 +83,7 @@ The easiest way to run this is with Docker Compose. You do not need to clone the
           - DEXCOM_PASS=your_password_here
           - DEXCOM_OUS=False # Set to True if outside US
           - USDA_API_KEY=your_key_here # Optional: Get free key at fdc.nal.usda.gov
+          - ARCHIVE_DAYS=120 # Default is 90 if omitted
           - TZ=America/New_York
           - PYTHONUNBUFFERED=1
         volumes:
@@ -121,6 +122,7 @@ If you use a dashboard like Portainer or Dockge, you can deploy this as a **Stac
           - DEXCOM_PASS=your_password_here
           - DEXCOM_OUS=False # Set to True if outside US
           - USDA_API_KEY=your_key_here # Optional: Get free key at fdc.nal.usda.gov
+          - ARCHIVE_DAYS=120 # Default is 90 if omitted
           - TZ=America/New_York
           - PYTHONUNBUFFERED=1
         volumes:
@@ -200,6 +202,7 @@ Contributions, issues, and feature requests are welcome! Feel free to check the 
 ## 📄 License
 
 This project is [MIT](https://www.google.com/search?q=LICENSE) licensed.
+
 
 
 
