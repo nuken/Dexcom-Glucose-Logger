@@ -20,11 +20,12 @@ A self-hosted, mobile-friendly dashboard that logs Dexcom (G4/G5/G6/G7) glucose 
 * **Printer Friendly:** One-click "Print" mode formatted perfectly for doctor visits.
 
 ### 🍽️ Meal Analysis
-* **Log Meals:** fast, mobile-friendly interface to log food, carbs, and notes.
+* **Log Meals:** Fast, mobile-friendly interface to log food, carbs, and notes.
+* **Carb Calculator:** **(New)** Built-in search tool powered by the USDA database. Enter items (e.g., "1 apple, 2 eggs") to automatically calculate total carbs.
 * **Spike Detection:** Automatically calculates glucose "Rise" (Peak - Start) for every meal.
 * **Carb Analysis:** "Carbs vs. Glucose Rise" scatter plot to identify which foods cause the biggest spikes.
 * **Full Management:** Edit or delete past meals to fix mistakes.
-
+  
 ### 💾 Data Freedom
 * **Health Export:** One-click CSV export of glucose readings formatted for medical analysis tools (Glooko/Tidepool).
 * **Meal Export:** Download your full meal history as a CSV for your own records.
@@ -76,7 +77,9 @@ The easiest way to run this is with Docker Compose. You do not need to clone the
           - DEXCOM_USER=your_username_here
           - DEXCOM_PASS=your_password_here
           - DEXCOM_OUS=False # Set to True if outside US
+          - USDA_API_KEY=your_key_here # Optional: Get free key at fdc.nal.usda.gov
           - TZ=America/New_York
+          - PYTHONUNBUFFERED=1
         volumes:
           - glucose_data:/app/data
 
@@ -100,26 +103,47 @@ If you use a dashboard like Portainer or Dockge, you can deploy this as a **Stac
 
 **Stack Configuration:**
 
-```yaml
-services:
-  web:
-    image: ghcr.io/nuken/dexcom-glucose-logger:latest
-    container_name: dexcom-web
-    restart: unless-stopped
-    ports:
-      - 5000:5000
-    environment:
-      - DEXCOM_USER=your_username
-      - DEXCOM_PASS=your_password
-      - DEXCOM_OUS=False
-      - TZ=America/New_York
+ ```yaml
+    services:
+      web:
+        image: ghcr.io/nuken/dexcom-glucose-logger:latest
+        container_name: dexcom-web
+        restart: unless-stopped
+        ports:
+          - 5000:5000
+        environment:
+          - DEXCOM_USER=your_username_here
+          - DEXCOM_PASS=your_password_here
+          - DEXCOM_OUS=False # Set to True if outside US
+          - USDA_API_KEY=your_key_here # Optional: Get free key at fdc.nal.usda.gov
+          - TZ=America/New_York
+          - PYTHONUNBUFFERED=1
+        volumes:
+          - glucose_data:/app/data
+
     volumes:
-      - glucose_data:/app/data
+      glucose_data:
+    ```
 
-volumes:
-  glucose_data:
+---
 
-```
+## 🍎 Carb Calculation Setup (Beta)
+
+The "Calculate Carbs" button uses the **USDA FoodData Central API** to search for nutrition info.
+
+1.  **Get a Free API Key:**
+    * Go to **[https://fdc.nal.usda.gov/api-key-signup](https://fdc.nal.usda.gov/api-key-signup.html)**.
+    * Fill out the form to receive your key instantly via email.
+
+2.  **Add to Config:**
+    * Add the key to your `compose.yaml` file:
+        ```yaml
+        environment:
+          - USDA_API_KEY=your_long_api_key_here
+        ```
+    * Restart your container: `docker compose up -d`.
+
+> **Note:** If you do not provide a key, the app will use the public `DEMO_KEY`, which is limited to **50 searches per day**.
 
 ---
 
@@ -132,6 +156,7 @@ You can configure the application using environment variables in `compose.yaml`:
 | `DEXCOM_USER` | **Required.** Your Dexcom account username. | `None` |
 | `DEXCOM_PASS` | **Required.** Your Dexcom account password. | `None` |
 | `DEXCOM_OUS` | Set to `True` if you live outside the US (International Account). | `False` |
+| `USDA_API_KEY`| **Optional.** Key for carb lookups. | `DEMO_KEY` |
 | `TZ` | Sets the timezone for the logs (e.g., `America/New_York`). | `UTC` |
 
 ---
@@ -170,6 +195,7 @@ Contributions, issues, and feature requests are welcome! Feel free to check the 
 ## 📄 License
 
 This project is [MIT](https://www.google.com/search?q=LICENSE) licensed.
+
 
 
 
