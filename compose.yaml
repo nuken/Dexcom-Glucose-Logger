@@ -8,8 +8,9 @@ services:
     environment:
       - DEXCOM_USER=your_username_here
       - DEXCOM_PASS=your_password_here
-      - USDA_API_KEY=your_key_here
-      - DEXCOM_OUS=False
+      - USDA_API_KEY=your_key_here # Optional: Get free key at fdc.nal.usda.gov
+      - ARCHIVE_DAYS=120 # Default is 90 if omitted
+      - DEXCOM_OUS=False # Set to True if outside US
       - PYTHONUNBUFFERED=1
       - TZ=America/New_York
     

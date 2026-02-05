@@ -2,14 +2,14 @@ import os
 import sqlite3
 import time
 import threading  # Added for background syncing
-import csv 
-import io  
+import csv
+import io
 import json
 import re
 import requests
 import math
 from datetime import datetime, timedelta
-from flask import Flask, render_template, jsonify, request, Response 
+from flask import Flask, render_template, jsonify, request, Response
 from pydexcom import Dexcom
 
 app = Flask(__name__)
@@ -20,7 +20,7 @@ DEXCOM_PASS = os.environ.get('DEXCOM_PASS')
 IS_OUS = os.environ.get('DEXCOM_OUS', 'False').lower() == 'true'
 DEXCOM_REGION = "ous" if IS_OUS else "us"
 DB_FILE = "/app/data/glucose.db"
-
+ARCHIVE_DAYS = int(os.environ.get('ARCHIVE_DAYS', 90))
 # USDA Configuration
 USDA_API_KEY = os.environ.get('USDA_API_KEY', 'DEMO_KEY')
 if USDA_API_KEY == 'your_key_here' or not USDA_API_KEY:
@@ -28,14 +28,14 @@ if USDA_API_KEY == 'your_key_here' or not USDA_API_KEY:
 
 # --- SYNC GLOBALS ---
 last_sync_time = 0
-SYNC_COOLDOWN = 60 
+SYNC_COOLDOWN = 60
 is_syncing = False  # Flag to prevent overlapping syncs
 
 # --- HELPER: TIME PARSING (OPTIMIZED) ---
 def parse_db_time(time_val):
     if isinstance(time_val, datetime): return time_val
     if not isinstance(time_val, str): return datetime.now()
-    
+
     # 1. FAST PATH: Try standard DB format first
     try:
         return datetime.strptime(time_val, '%Y-%m-%d %H:%M:%S')
@@ -63,6 +63,52 @@ def parse_db_time(time_val):
         return datetime.now()
 
 # --- DATABASE ---
+def archive_old_data():
+    """
+    Moves readings older than ARCHIVE_DAYS to a CSV file in /app/data/archives
+    and deletes them from the main database to save space.
+    """
+    if ARCHIVE_DAYS <= 0:
+        return
+
+    try:
+        # Calculate the cutoff date
+        cutoff_date = datetime.now() - timedelta(days=ARCHIVE_DAYS)
+        archive_dir = "/app/data/archives"
+        os.makedirs(archive_dir, exist_ok=True)
+
+        with sqlite3.connect(DB_FILE) as conn:
+            # Check if there is data to archive
+            count = conn.execute("SELECT COUNT(*) FROM readings WHERE timestamp < ?", (cutoff_date,)).fetchone()[0]
+
+            if count > 0:
+                print(f"📦 Archiving {count} readings older than {ARCHIVE_DAYS} days...")
+
+                # Fetch the old data
+                cursor = conn.execute("SELECT * FROM readings WHERE timestamp < ?", (cutoff_date,))
+                rows = cursor.fetchall()
+                headers = [description[0] for description in cursor.description]
+
+                # Generate a filename with the current timestamp
+                filename = f"glucose_archive_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+                filepath = os.path.join(archive_dir, filename)
+
+                # Write to CSV
+                with open(filepath, 'w', newline='') as f:
+                    writer = csv.writer(f)
+                    writer.writerow(headers)
+                    writer.writerows(rows)
+
+                # Delete from database and optimize
+                conn.execute("DELETE FROM readings WHERE timestamp < ?", (cutoff_date,))
+                conn.execute("VACUUM")
+                print(f"✅ Archived to {filename} and cleaned database.")
+            else:
+                print(f"📦 No data older than {ARCHIVE_DAYS} days to archive.")
+
+    except Exception as e:
+        print(f"❌ Archive failed: {e}")
+
 def init_db():
     os.makedirs(os.path.dirname(DB_FILE), exist_ok=True)
     with sqlite3.connect(DB_FILE) as conn:
@@ -97,20 +143,20 @@ def background_sync_task():
     try:
         print("Starting background sync...")
         last_db_time = get_last_reading_time()
-        
+
         if not last_db_time:
-            minutes_to_fetch = 1440 
+            minutes_to_fetch = 1440
         else:
             now = datetime.now()
             last_naive = last_db_time.replace(tzinfo=None) if last_db_time.tzinfo else last_db_time
             gap_minutes = (now - last_naive).total_seconds() / 60
-            
-            if gap_minutes < 5: 
+
+            if gap_minutes < 5:
                 print("Data is up to date.")
                 last_sync_time = time.time()
-                return 
-            
-            minutes_to_fetch = min(int(gap_minutes) + 20, 1440)
+                return
+
+            minutes_to_fetch = max(1, min(int(gap_minutes) + 20, 1440))
 
         print(f"Connecting to Dexcom (Lookback: {minutes_to_fetch}m)...")
         dexcom = Dexcom(username=DEXCOM_USER, password=DEXCOM_PASS, region=DEXCOM_REGION)
@@ -118,7 +164,7 @@ def background_sync_task():
         save_readings_to_db(readings)
         last_sync_time = time.time()
         print(f"Sync complete. Saved {len(readings) if readings else 0} readings.")
-        
+
     except Exception as e:
         print(f"Sync Failed: {e}")
     finally:
@@ -135,8 +181,11 @@ def smart_sync():
     thread = threading.Thread(target=background_sync_task)
     thread.start()
 
-try: init_db()
-except: pass
+try:
+    init_db()
+    archive_old_data()
+except:
+    pass
 
 # --- ROUTES ---
 @app.route('/')
@@ -178,14 +227,14 @@ def handle_meals():
                     meal_time = parse_db_time(meal['timestamp'])
                     if meal_time.tzinfo is not None: meal_time = meal_time.replace(tzinfo=None)
                     end_window = meal_time + timedelta(hours=2)
-                    
+
                     cursor.execute("SELECT mg_dl, timestamp FROM readings WHERE timestamp >= ? AND timestamp <= ? ORDER BY timestamp ASC", (meal_time, end_window))
                     window_readings = cursor.fetchall()
-                    
+
                     start_glucose = window_readings[0]['mg_dl'] if window_readings else None
                     peak_glucose = max((r['mg_dl'] for r in window_readings), default=None)
                     rise = (peak_glucose - start_glucose) if (peak_glucose and start_glucose) else 0
-                    
+
                     timeline = []
                     checkpoints = [0, 30, 60, 90, 120]
                     if window_readings:
@@ -231,7 +280,7 @@ def single_meal_ops(meal_id):
             data = request.json
             dt = datetime.fromisoformat(data['timestamp'].replace('Z', '+00:00'))
             items_json = json.dumps(data.get('items', []))
-            conn.execute("UPDATE meals SET timestamp=?, meal_type=?, items=?, carbs=?, notes=? WHERE id=?", 
+            conn.execute("UPDATE meals SET timestamp=?, meal_type=?, items=?, carbs=?, notes=? WHERE id=?",
                 (dt, data['meal_type'], items_json, data.get('carbs'), data.get('notes'), meal_id))
             return jsonify({'success': True})
 
@@ -240,7 +289,7 @@ def calculate_carbs():
     items = request.json.get('items', [])
     total_carbs = 0
     using_demo = (USDA_API_KEY == 'DEMO_KEY')
-    
+
     for item in items:
         url = f"https://api.nal.usda.gov/fdc/v1/foods/search?api_key={USDA_API_KEY}&query={item}&pageSize=1"
         try:
@@ -253,9 +302,9 @@ def calculate_carbs():
                 carb_val = next((n['value'] for n in nutrients if "Carbohydrate" in n.get('nutrientName', '')), 0)
                 total_carbs += carb_val
         except: continue
-            
+
     return jsonify({
-        'total_carbs': int(math.ceil(total_carbs)), 
+        'total_carbs': int(math.ceil(total_carbs)),
         'is_demo': using_demo
     })
 
@@ -267,12 +316,12 @@ def get_readings():
         minutes = int(request.args.get('minutes', 1440))
         target_interval = 0 if step == 1 else (step * 5)
         cutoff = datetime.now() - timedelta(minutes=minutes)
-        
+
         data = []
         with sqlite3.connect(DB_FILE) as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT time_str, mg_dl, trend, trend_arrow FROM readings WHERE timestamp > ? ORDER BY timestamp DESC", (cutoff,))
-            
+
             last_kept = None
             for row in cursor.fetchall():
                 dt = parse_db_time(row[0])
