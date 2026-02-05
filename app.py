@@ -1,12 +1,13 @@
 import os
 import sqlite3
-import threading
 import time
 import csv 
 import io  
 import json
 import re
-from datetime import datetime, timedelta, timezone
+import requests
+import math  # <--- NEW IMPORT
+from datetime import datetime, timedelta
 from flask import Flask, render_template, jsonify, request, Response 
 from pydexcom import Dexcom
 
@@ -19,6 +20,11 @@ IS_OUS = os.environ.get('DEXCOM_OUS', 'False').lower() == 'true'
 DEXCOM_REGION = "ous" if IS_OUS else "us"
 DB_FILE = "/app/data/glucose.db"
 
+# USDA Configuration
+USDA_API_KEY = os.environ.get('USDA_API_KEY', 'DEMO_KEY')
+if USDA_API_KEY == 'your_key_here' or not USDA_API_KEY:
+    USDA_API_KEY = 'DEMO_KEY'
+
 last_sync_time = 0
 SYNC_COOLDOWN = 60 # Check at most once per minute
 
@@ -27,13 +33,11 @@ def parse_db_time(time_val):
     if isinstance(time_val, datetime): return time_val
     if not isinstance(time_val, str): return datetime.now()
     
-    # Regex to handle various formats (with/without T, microsec, timezone)
     match = re.match(r'(\d{4}-\d{2}-\d{2})[T ](\d{2}:\d{2}:\d{2})(?:\.(\d+))?([+-]\d{2}:?\d{2}|Z)?', time_val)
     if match:
         date_part, time_part, micro_part, tz_part = match.groups()
         iso_str = f"{date_part}T{time_part}"
         if micro_part: iso_str += f".{micro_part}"
-        # Strip timezone for chart consistency if needed, or handle it
         if tz_part:
             if len(tz_part) == 5 and tz_part != 'Z' and ':' not in tz_part:
                 tz_part = tz_part[:3] + ':' + tz_part[3:]
@@ -60,7 +64,6 @@ def save_readings_to_db(readings):
     if not readings: return
     with sqlite3.connect(DB_FILE) as conn:
         for r in readings:
-            # We enforce a clean ISO string for time_str to prevent dupes
             t_str = r.datetime.strftime('%Y-%m-%d %H:%M:%S')
             try:
                 conn.execute("INSERT OR IGNORE INTO readings (time_str, timestamp, mg_dl, trend, trend_arrow) VALUES (?, ?, ?, ?, ?)",
@@ -78,10 +81,9 @@ def get_last_reading_time():
 
 # --- SYNC LOGIC ---
 def smart_sync():
-    """Syncs only what is needed based on DB state."""
     global last_sync_time
     
-    # 1. Rate Limit
+    # 1. Rate Limit (In-Memory)
     if time.time() - last_sync_time < SYNC_COOLDOWN:
         return
 
@@ -89,12 +91,10 @@ def smart_sync():
         print("Checking Dexcom sync...")
         last_db_time = get_last_reading_time()
         
-        # Determine lookback window
         if not last_db_time:
-            minutes_to_fetch = 1440 * 3 # First run: Get 3 days
+            # FIX: Dexcom API limit is 1440 minutes (24 hours) per request
+            minutes_to_fetch = 1440 
         else:
-            # Calculate gap in minutes
-            # Remove timezone info for calculation to prevent errors
             now = datetime.now()
             last_naive = last_db_time.replace(tzinfo=None) if last_db_time.tzinfo else last_db_time
             gap_minutes = (now - last_naive).total_seconds() / 60
@@ -102,9 +102,8 @@ def smart_sync():
             if gap_minutes < 5: 
                 print("Data is up to date.")
                 last_sync_time = time.time()
-                return # Data is fresh
+                return 
             
-            # Fetch gap + 20 mins buffer, max 24 hours (1440)
             minutes_to_fetch = min(int(gap_minutes) + 20, 1440)
 
         print(f"Connecting to Dexcom (Lookback: {minutes_to_fetch}m)...")
@@ -117,7 +116,6 @@ def smart_sync():
     except Exception as e:
         print(f"Sync Failed: {e}")
 
-# Initialize DB on start
 try:
     init_db()
 except: pass
@@ -227,9 +225,41 @@ def single_meal_ops(meal_id):
             """, (dt, data['meal_type'], items_json, data.get('carbs'), data.get('notes'), meal_id))
             return jsonify({'success': True})
 
+@app.route('/api/calculate-carbs', methods=['POST'])
+def calculate_carbs():
+    items = request.json.get('items', [])
+    total_carbs = 0
+    using_demo = (USDA_API_KEY == 'DEMO_KEY')
+    
+    for item in items:
+        url = f"https://api.nal.usda.gov/fdc/v1/foods/search?api_key={USDA_API_KEY}&query={item}&pageSize=1"
+        try:
+            r = requests.get(url, timeout=5)
+            if r.status_code == 429:
+                return jsonify({'error': 'Rate limit exceeded. Please get a free API key at fdc.nal.usda.gov'}), 429
+            
+            data = r.json()
+            if data.get('foods'):
+                food = data['foods'][0]
+                nutrients = food.get('foodNutrients', [])
+                carb_val = 0
+                for n in nutrients:
+                    if "Carbohydrate" in n.get('nutrientName', ''):
+                        carb_val = n.get('value', 0)
+                        break
+                total_carbs += carb_val
+        except Exception as e:
+            print(f"Error looking up {item}: {e}")
+            continue
+            
+    return jsonify({
+        # Round up to the nearest whole number for safer bolusing
+        'total_carbs': int(math.ceil(total_carbs)), 
+        'is_demo': using_demo
+    })
+
 @app.route('/api/readings')
 def get_readings():
-    # Trigger Smart Sync
     smart_sync()
         
     try:
@@ -237,14 +267,11 @@ def get_readings():
         minutes = int(request.args.get('minutes', 1440))
         target_interval = 0 if step == 1 else (step * 5)
         
-        # Calculate Cutoff
-        # Use simple UTC calculation to handle naive/aware mismatches safely
         cutoff = datetime.now() - timedelta(minutes=minutes)
         
         data = []
         with sqlite3.connect(DB_FILE) as conn:
             cursor = conn.cursor()
-            # We filter by time_str (YYYY-MM-DD...) which is safer if types are mixed
             cursor.execute("SELECT time_str, mg_dl, trend, trend_arrow FROM readings WHERE timestamp > ? ORDER BY timestamp DESC", (cutoff,))
             
             last_kept = None
@@ -255,8 +282,6 @@ def get_readings():
                     data.append({'timestamp': row[0], 'time': dt.strftime('%b %d, %Y %-I:%M %p'), 'mg_dl': row[1], 'trend': row[2], 'trend_arrow': row[3]})
         return jsonify(data)
     except Exception as e: return jsonify({'error': str(e)}), 500
-
-# --- EXPORTS ---
 
 @app.route('/api/export/health')
 def export_health_csv():

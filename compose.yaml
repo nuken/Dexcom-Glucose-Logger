@@ -4,17 +4,22 @@ services:
     container_name: dexcom-web
     restart: unless-stopped
     ports:
-      - 8095:5000
+      - 5000:5000
     environment:
       - DEXCOM_USER=your_username_here
       - DEXCOM_PASS=your_password_here
+      - USDA_API_KEY=your_key_here
       - DEXCOM_OUS=False
+      - PYTHONUNBUFFERED=1
       - TZ=America/New_York
     # ADD THIS SECTION BELOW:
     volumes:
       - ./:/app
     networks:
       - dexcom-net
+    # Force single worker to prevent race conditions during sync
+    command: gunicorn -w 1 -b 0.0.0.0:5000 app:app
+    
 networks:
   dexcom-net:
     driver: bridge

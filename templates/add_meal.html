@@ -77,7 +77,7 @@
                 <div class="row g-2 mb-4">
                     <div class="col-4">
                         <label class="form-label">Carbs (g)</label>
-                        <input type="number" id="carbsInput" class="form-control" placeholder="Optional">
+                        <input type="number" step="any" id="carbsInput" class="form-control" placeholder="Optional">
                     </div>
                     <div class="col-8">
                         <label class="form-label">Notes</label>
@@ -85,31 +85,35 @@
                     </div>
                 </div>
 
+                <div id="demoWarning" class="alert alert-warning py-2 small d-none" style="font-size: 0.8rem;">
+                    ⚠️ <strong>Demo Mode:</strong> You are using the USDA shared demo key. 
+                    Calculations are limited to 50 searches per day. Get a free key at fdc.nal.usda.gov.
+                </div>
+
+                <button type="button" id="calcBtn" class="btn btn-outline-info w-100 mb-3 fw-bold" onclick="calculateCarbs()">
+                    Calculate Carbs (Beta)
+                </button>
+
                 <button type="submit" class="btn btn-primary w-100 btn-lg shadow-sm">Save Meal</button>
             </form>
         </div>
     </div>
 
     <script>
-        // 1. Initialize with "Now" and one empty food item
         document.addEventListener('DOMContentLoaded', () => {
             setNow();
             addFoodItem();
         });
 
-        // 2. "Set to Now" Logic
         function setNow() {
             const now = new Date();
-            // Format Date: YYYY-MM-DD
             const dateStr = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
-            // Format Time: HH:MM
             const timeStr = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
 
             document.getElementById('dateInput').value = dateStr;
             document.getElementById('timeInput').value = timeStr;
         }
 
-        // 3. Dynamic Food Items
         function addFoodItem() {
             const container = document.getElementById('foodList');
             const div = document.createElement('div');
@@ -119,21 +123,59 @@
                 <button class="btn btn-outline-danger" type="button" onclick="this.parentElement.remove()">✕</button>
             `;
             container.appendChild(div);
-            // Focus the new input
             div.querySelector('input').focus();
         }
 
-        // 4. Handle Form Submission
-        document.getElementById('mealForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-
-            // Collect Food Items
+        async function calculateCarbs() {
             const items = [];
             document.querySelectorAll('.food-input').forEach(input => {
                 if(input.value.trim()) items.push(input.value.trim());
             });
 
-            // Construct Timestamp (ISO Format)
+            if (items.length === 0) return alert("Please enter food items first!");
+
+            const btn = document.getElementById('calcBtn');
+            const originalText = btn.innerText;
+            btn.innerText = "🔍 Searching USDA...";
+            btn.disabled = true;
+
+            try {
+                const res = await fetch('/api/calculate-carbs', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ items: items })
+                });
+                
+                const data = await res.json();
+                
+                if (res.status === 429) {
+                    alert(data.error);
+                } else {
+                    document.getElementById('carbsInput').value = data.total_carbs;
+                    
+                    const warning = document.getElementById('demoWarning');
+                    if (data.is_demo) {
+                        warning.classList.remove('d-none');
+                    } else {
+                        warning.classList.add('d-none');
+                    }
+                }
+            } catch (err) {
+                alert("Calculation failed: " + err);
+            } finally {
+                btn.innerText = originalText;
+                btn.disabled = false;
+            }
+        }
+
+        document.getElementById('mealForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const items = [];
+            document.querySelectorAll('.food-input').forEach(input => {
+                if(input.value.trim()) items.push(input.value.trim());
+            });
+
             const dateVal = document.getElementById('dateInput').value;
             const timeVal = document.getElementById('timeInput').value;
             const timestamp = `${dateVal}T${timeVal}:00`;
@@ -154,7 +196,6 @@
                 });
 
                 if (res.ok) {
-                    // Redirect to the Dashboard (or the Meal History page we will build next)
                     window.location.href = '/';
                 } else {
                     alert('Error saving meal');
