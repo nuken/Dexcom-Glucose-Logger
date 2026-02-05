@@ -46,6 +46,7 @@ A self-hosted, mobile-friendly dashboard that logs Dexcom (G4/G5/G6/G7) glucose 
 </p>
 
 _Top: The trends dashboard and meal history timeline. Bottom: The detailed glucose log and the new carb-calculation meal entry form._
+
 ---
 
 ## ✅ Prerequisites
@@ -199,6 +200,7 @@ Contributions, issues, and feature requests are welcome! Feel free to check the 
 ## 📄 License
 
 This project is [MIT](https://www.google.com/search?q=LICENSE) licensed.
+
 
 
 
