@@ -36,12 +36,16 @@ A self-hosted, mobile-friendly dashboard that logs Dexcom (G4/G5/G6/G7) glucose 
 ## 🖼️ Screenshots
 
 <p align="center">
-  <img src="screenshots/logs.jpeg" width="45%" alt="Glucose Log View" />
-  <img src="screenshots/trends.jpeg" width="45%" alt="Trends View" />
+  <img src="screenshots/trends.jpeg" width="48%" alt="Trends View" />
+  <img src="screenshots/history.jpeg" width="48%" alt="Meal History" />
 </p>
 
-_Left: The main log providing a clean, sortable history. Right: The new trends dashboard with Time-in-Range visualization._
+<p align="center">
+  <img src="screenshots/log.jpeg" width="48%" alt="Glucose Log" />
+  <img src="screenshots/add_meal.jpeg" width="48%" alt="Add Meal Modal" />
+</p>
 
+_Top: The trends dashboard and meal history timeline. Bottom: The detailed glucose log and the new carb-calculation meal entry form._
 ---
 
 ## ✅ Prerequisites
@@ -195,6 +199,7 @@ Contributions, issues, and feature requests are welcome! Feel free to check the 
 ## 📄 License
 
 This project is [MIT](https://www.google.com/search?q=LICENSE) licensed.
+
 
 
 
