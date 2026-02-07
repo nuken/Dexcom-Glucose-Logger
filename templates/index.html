@@ -118,7 +118,11 @@
         $(document).ready(function() {
             var table = $('#glucoseTable').DataTable({
                 columns: [
-                    { data: 'timestamp', render: (d, t, r) => (t === 'display') ? r.time : d },
+                    { 
+                    data: 'timestamp', 
+                    className: 'text-nowrap',  // <--- ADD THIS LINE
+                    render: (d, t, r) => (t === 'display') ? r.time : d 
+                },
                     { data: 'mg_dl', render: (d, t, r) => (t === 'sort') ? d : `<div class="glucose-wrapper"><div class="arrow-badge">${r.trend_arrow}</div><div><div class="glucose-val">${d}</div><div class="unit-label">mg/dL</div></div></div>` },
                     { data: 'trend' }
                 ],
